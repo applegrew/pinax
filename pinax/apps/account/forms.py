@@ -35,6 +35,7 @@ class GroupForm(forms.Form):
     
     def __init__(self, *args, **kwargs):
         self.group = kwargs.pop("group", None)
+        kwargs.pop("request", None) #This is not stored. If needed, sub-class may store it.
         super(GroupForm, self).__init__(*args, **kwargs)
 
 
@@ -290,6 +291,7 @@ class UserForm(forms.Form):
     
     def __init__(self, user=None, *args, **kwargs):
         self.user = user
+        kwargs.pop("request", None) #This is not stored. If needed, sub-class may store it.
         super(UserForm, self).__init__(*args, **kwargs)
 
 
@@ -351,6 +353,11 @@ class ChangePasswordForm(UserForm):
         widget = forms.PasswordInput(render_value=False)
     )
     
+    def __init__(self, user=None, *args, **kwargs):
+        super(ChangePasswordForm, self).__init__(user, *args, **kwargs)
+        if not user.has_usable_password():
+            del self.fields['oldpassword'] #If password is not set or not usuable then oldpassword is not set.
+
     def clean_oldpassword(self):
         if not self.user.check_password(self.cleaned_data.get("oldpassword")):
             raise forms.ValidationError(_("Please type your current password."))
@@ -395,6 +402,10 @@ class ResetPasswordForm(forms.Form):
         required = True,
         widget = forms.TextInput(attrs={"size":"30"})
     )
+
+    def __init__(self, *args, **kwargs):
+        kwargs.pop("request", None) #This is not stored. If needed, sub-class may store it.
+        super(ResetPasswordForm, self).__init__(*args, **kwargs)
     
     def clean_email(self):
         if EmailAddress.objects.filter(email__iexact=self.cleaned_data["email"], verified=True).count() == 0:
@@ -443,6 +454,7 @@ class ResetPasswordKeyForm(forms.Form):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
         self.temp_key = kwargs.pop("temp_key", None)
+        kwargs.pop("request", None) #This is not stored. If needed, sub-class may store it.
         super(ResetPasswordKeyForm, self).__init__(*args, **kwargs)
     
     def clean_password2(self):

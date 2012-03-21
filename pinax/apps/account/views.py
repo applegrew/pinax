@@ -15,6 +15,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth.views import logout as django_logout
 
 from emailconfirmation.models import EmailAddress, EmailConfirmation
+from emailconfirmation.views import confirm_email as emailconfirmation_check
 
 association_model = models.get_model("django_openid", "Association")
 if association_model is not None:
@@ -26,6 +27,18 @@ from pinax.apps.account.forms import ChangeTimezoneForm, LoginForm, ResetPasswor
 from pinax.apps.account.forms import ResetPasswordForm, SetPasswordForm, SignupForm
 from pinax.apps.account.signals import timezone_changed
 
+def personalArgsAllowed(kwargsToCheck):
+    def wrapped(f):
+        fname = f.__name__
+        def aux(request, **kwargs):
+            for arg in kwargsToCheck:
+                val = kwargs.pop('%s_%s' % (fname, arg), None)
+                if val is not None:
+                    kwargs[arg] = val
+        
+            return f(request, **kwargs)
+        return aux
+    return wrapped
 
 def group_and_bridge(kwargs):
     """
@@ -52,7 +65,7 @@ def group_context(group, bridge):
         "group": group,
     }
 
-
+@personalArgsAllowed(['form_class', 'template_name', 'extra_context'])
 def login(request, **kwargs):
     
     form_class = kwargs.pop("form_class", LoginForm)
@@ -76,7 +89,7 @@ def login(request, **kwargs):
         success_url = get_default_redirect(request, fallback_url, redirect_field_name)
     
     if request.method == "POST" and not url_required:
-        form = form_class(request.POST, group=group)
+        form = form_class(request.POST, group=group, request=request)
         if form.is_valid():
             form.login(request)
             if associate_openid and association_model is not None:
@@ -92,7 +105,7 @@ def login(request, **kwargs):
             )
             return HttpResponseRedirect(success_url)
     else:
-        form = form_class(group=group)
+        form = form_class(group=group, request=request)
     
     ctx = group_context(group, bridge)
     ctx.update({
@@ -113,11 +126,22 @@ def logout(request, next_page=None, **kwargs):
     if next_page is None and hasattr(settings, "LOGOUT_REDIRECT_URLNAME"):
         next_page = reverse(settings.LOGOUT_REDIRECT_URLNAME)
 
-    return django_logout(request, next_page, **kwargs)
+	newKwargs = {}
+	template_name = kwargs.pop('template_name', None)
+	if not template_name is None:
+		newKwargs['template_name'] = template_name
+	redirect_field_name = kwargs.pop('redirect_field_name', None)
+	if not redirect_field_name is None:
+		newKwargs['redirect_field_name'] = redirect_field_name
+     
+	newKwargs['current_app'] = kwargs.pop('current_app', None)
+    newKwargs['extra_context'] = kwargs.pop('current_app', {})
+    return django_logout(request, next_page, **newKwargs)
 
 
+@personalArgsAllowed(['form_class', 'template_name'])
 def signup(request, **kwargs):
-    
+
     form_class = kwargs.pop("form_class", SignupForm)
     template_name = kwargs.pop("template_name", "account/signup.html")
     redirect_field_name = kwargs.pop("redirect_field_name", "next")
@@ -137,7 +161,7 @@ def signup(request, **kwargs):
         success_url = get_default_redirect(request, fallback_url, redirect_field_name)
     
     if request.method == "POST":
-        form = form_class(request.POST, request.FILES, group=group)
+        form = form_class(request.POST, request.FILES, group=group, request=request)
         if form.is_valid():
             user = form.save(request=request)
             if settings.ACCOUNT_EMAIL_VERIFICATION:
@@ -156,7 +180,7 @@ def signup(request, **kwargs):
                 )
                 return HttpResponseRedirect(success_url)
     else:
-        form = form_class(group=group)
+        form = form_class(group=group, request=request)
     
     ctx.update({
         "form": form,
@@ -168,16 +192,17 @@ def signup(request, **kwargs):
 
 
 @login_required
+@personalArgsAllowed(['form_class', 'template_name'])
 def email(request, **kwargs):
-    
-    form_class = kwargs.pop("form_class", AddEmailForm)
+
+    form_class = kwargs.pop("form_class", AddEmailForm) 
     template_name = kwargs.pop("template_name", "account/email.html")
     
     group, bridge = group_and_bridge(kwargs)
     
     if request.method == "POST" and request.user.is_authenticated():
         if request.POST["action"] == "add":
-            add_email_form = form_class(request.user, request.POST)
+            add_email_form = form_class(request.user, request.POST, request=request)
             if add_email_form.is_valid():
                 add_email_form.save()
                 messages.add_message(request, messages.INFO,
@@ -185,9 +210,9 @@ def email(request, **kwargs):
                             "email": add_email_form.cleaned_data["email"]
                         }
                     )
-                add_email_form = form_class() # @@@
+                add_email_form = form_class(request=request) # @@@
         else:
-            add_email_form = form_class()
+            add_email_form = form_class(request=request)
             if request.POST["action"] == "send":
                 email = request.POST["email"]
                 try:
@@ -226,7 +251,7 @@ def email(request, **kwargs):
                 )
                 email_address.set_as_primary()
     else:
-        add_email_form = form_class()
+        add_email_form = form_class(request=request)
     
     ctx = group_context(group, bridge)
     ctx.update({
@@ -237,9 +262,10 @@ def email(request, **kwargs):
 
 
 @login_required
+@personalArgsAllowed(['form_class', 'template_name'])
 def password_change(request, **kwargs):
-    
-    form_class = kwargs.pop("form_class", ChangePasswordForm)
+
+    form_class = kwargs.pop("form_class", ChangePasswordForm)   
     template_name = kwargs.pop("template_name", "account/password_change.html")
     
     group, bridge = group_and_bridge(kwargs)
@@ -248,15 +274,15 @@ def password_change(request, **kwargs):
         return HttpResponseRedirect(reverse("acct_passwd_set"))
     
     if request.method == "POST":
-        password_change_form = form_class(request.user, request.POST)
+        password_change_form = form_class(request.user, request.POST, request=request)
         if password_change_form.is_valid():
             password_change_form.save()
             messages.add_message(request, messages.SUCCESS,
                 ugettext(u"Password successfully changed.")
             )
-            password_change_form = form_class(request.user)
+            password_change_form = form_class(request.user, request=request)
     else:
-        password_change_form = form_class(request.user)
+        password_change_form = form_class(request.user, request=request)
     
     ctx = group_context(group, bridge)
     ctx.update({
@@ -267,9 +293,10 @@ def password_change(request, **kwargs):
 
 
 @login_required
+@personalArgsAllowed(['form_class', 'template_name'])
 def password_set(request, **kwargs):
-    
-    form_class = kwargs.pop("form_class", SetPasswordForm)
+
+    form_class = kwargs.pop("form_class", SetPasswordForm)  
     template_name = kwargs.pop("template_name", "account/password_set.html")
     
     group, bridge = group_and_bridge(kwargs)
@@ -278,7 +305,7 @@ def password_set(request, **kwargs):
         return HttpResponseRedirect(reverse("acct_passwd"))
     
     if request.method == "POST":
-        password_set_form = form_class(request.user, request.POST)
+        password_set_form = form_class(request.user, request.POST, request=request)
         if password_set_form.is_valid():
             password_set_form.save()
             messages.add_message(request, messages.SUCCESS,
@@ -286,7 +313,7 @@ def password_set(request, **kwargs):
             )
             return HttpResponseRedirect(reverse("acct_passwd"))
     else:
-        password_set_form = form_class(request.user)
+        password_set_form = form_class(request.user, request=request)
     
     ctx = group_context(group, bridge)
     ctx.update({
@@ -297,6 +324,7 @@ def password_set(request, **kwargs):
 
 
 @login_required
+@personalArgsAllowed(['template_name'])
 def password_delete(request, **kwargs):
     
     template_name = kwargs.pop("template_name", "account/password_delete.html")
@@ -319,8 +347,9 @@ def password_delete(request, **kwargs):
     return render_to_response(template_name, RequestContext(request, ctx))
 
 
+@personalArgsAllowed(['form_class', 'template_name'])
 def password_reset(request, **kwargs):
-    
+
     form_class = kwargs.pop("form_class", ResetPasswordForm)
     template_name = kwargs.pop("template_name", "account/password_reset.html")
     
@@ -328,7 +357,7 @@ def password_reset(request, **kwargs):
     ctx = group_context(group, bridge)
     
     if request.method == "POST":
-        password_reset_form = form_class(request.POST)
+        password_reset_form = form_class(request.POST, request=request)
         if password_reset_form.is_valid():
             password_reset_form.save()
             if group:
@@ -337,7 +366,7 @@ def password_reset(request, **kwargs):
                 redirect_to = reverse("acct_passwd_reset_done")
             return HttpResponseRedirect(redirect_to)
     else:
-        password_reset_form = form_class()
+        password_reset_form = form_class(request=request)
     
     ctx.update({
         "password_reset_form": password_reset_form,
@@ -346,6 +375,7 @@ def password_reset(request, **kwargs):
     return render_to_response(template_name, RequestContext(request, ctx))
 
 
+@personalArgsAllowed(['template_name'])
 def password_reset_done(request, **kwargs):
     
     template_name = kwargs.pop("template_name", "account/password_reset_done.html")
@@ -356,9 +386,10 @@ def password_reset_done(request, **kwargs):
     return render_to_response(template_name, RequestContext(request, ctx))
 
 
+@personalArgsAllowed(['form_class', 'template_name'])
 def password_reset_from_key(request, uidb36, key, **kwargs):
-    
-    form_class = kwargs.get("form_class", ResetPasswordKeyForm)
+
+    form_class = kwargs.get("form_class", ResetPasswordKeyForm) 
     template_name = kwargs.get("template_name", "account/password_reset_from_key.html")
     token_generator = kwargs.get("token_generator", default_token_generator)
     
@@ -375,7 +406,7 @@ def password_reset_from_key(request, uidb36, key, **kwargs):
     
     if token_generator.check_token(user, key):
         if request.method == "POST":
-            password_reset_key_form = form_class(request.POST, user=user, temp_key=key)
+            password_reset_key_form = form_class(request.POST, user=user, temp_key=key, request=request)
             if password_reset_key_form.is_valid():
                 password_reset_key_form.save()
                 messages.add_message(request, messages.SUCCESS,
@@ -383,7 +414,7 @@ def password_reset_from_key(request, uidb36, key, **kwargs):
                 )
                 password_reset_key_form = None
         else:
-            password_reset_key_form = form_class()
+            password_reset_key_form = form_class(request=request)
         ctx.update({
             "form": password_reset_key_form,
         })
@@ -396,15 +427,16 @@ def password_reset_from_key(request, uidb36, key, **kwargs):
 
 
 @login_required
+@personalArgsAllowed(['form_class', 'template_name'])
 def timezone_change(request, **kwargs):
     
-    form_class = kwargs.pop("form_class", ChangeTimezoneForm)
+    form_class = kwargs.pop("form_class", ChangeTimezoneForm)   
     template_name = kwargs.pop("template_name", "account/timezone_change.html")
     
     group, bridge = group_and_bridge(kwargs)
     
     if request.method == "POST":
-        form = form_class(request.user, request.POST)
+        form = form_class(request.user, request.POST, request=request)
         if form.is_valid():
             from_timezone = form.account.timezone
             form.save()
@@ -420,7 +452,7 @@ def timezone_change(request, **kwargs):
                 ugettext(u"Timezone successfully updated.")
             )
     else:
-        form = form_class(request.user)
+        form = form_class(request.user, request=request)
     
     ctx = group_context(group, bridge)
     ctx.update({
@@ -431,15 +463,16 @@ def timezone_change(request, **kwargs):
 
 
 @login_required
+@personalArgsAllowed(['form_class', 'template_name'])
 def language_change(request, **kwargs):
-    
-    form_class = kwargs.pop("form_class", ChangeLanguageForm)
+
+    form_class = kwargs.pop("form_class", ChangeLanguageForm)   
     template_name = kwargs.pop("template_name", "account/language_change.html")
     
     group, bridge = group_and_bridge(kwargs)
     
     if request.method == "POST":
-        form = form_class(request.user, request.POST)
+        form = form_class(request.user, request.POST, request=request)
         if form.is_valid():
             form.save()
             messages.add_message(request, messages.SUCCESS,
@@ -448,7 +481,7 @@ def language_change(request, **kwargs):
             next = request.META.get("HTTP_REFERER", None)
             return HttpResponseRedirect(next)
     else:
-        form = form_class(request.user)
+        form = form_class(request.user, request=request)
     
     ctx = group_context(group, bridge)
     ctx.update({
@@ -456,3 +489,7 @@ def language_change(request, **kwargs):
     })
     
     return render_to_response(template_name, RequestContext(request, ctx))
+
+def confirm_email(request, confirmation_key, **kwargs):
+	return emailconfirmation_check(request, confirmation_key)
+	
