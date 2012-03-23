@@ -21,6 +21,7 @@ urlpatterns = patterns("",
     url(r"^language/$", "pinax.apps.account.views.language_change", name="acct_language_change"),
     url(r"^logout/$", "pinax.apps.account.views.logout", {"template_name": "account/logout.html"}, name="acct_logout"),
     url(r"^confirm_email/(\w+)/$", "pinax.apps.account.views.confirm_email", name="acct_confirm_email"),
+    url(r"^confirm_email/(\w+)/$", "pinax.apps.account.views.confirm_email", name="emailconfirmation_confirm_email"), #Needed for reverse lookup in emailconfirmation to work.
     url(r"^password_reset/$", "pinax.apps.account.views.password_reset", name="acct_passwd_reset"),
     url(r"^password_reset/done/$", "pinax.apps.account.views.password_reset_done", name="acct_passwd_reset_done"),
     url(r"^password_reset_key/(?P<uidb36>[0-9A-Za-z]+)-(?P<key>.+)/$", "pinax.apps.account.views.password_reset_from_key", name="acct_passwd_reset_key"),
