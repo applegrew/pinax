@@ -33,13 +33,14 @@ class PinaxConsumer(RegistrationConsumer):
     redirect_field_name = "next"
     
     def on_registration_complete(self, request):
-        if hasattr(settings, "LOGIN_REDIRECT_URLNAME"):
-            fallback_url = reverse(settings.LOGIN_REDIRECT_URLNAME)
-        else:
-            fallback_url = settings.LOGIN_REDIRECT_URL
-        return HttpResponseRedirect(get_default_redirect(request, fallback_url))
+        return HttpResponseRedirect(self.get_success_url(request, False))
     
     def show_i_have_logged_you_in(self, request):
+        messages.add_message(request, messages.SUCCESS,
+            ugettext("Successfully logged in as %(user)s.") % {
+                "user": user_display(request.user)
+            }
+        )
         if hasattr(settings, "LOGIN_REDIRECT_URLNAME"):
             fallback_url = reverse(settings.LOGIN_REDIRECT_URLNAME)
         else:
@@ -49,16 +50,17 @@ class PinaxConsumer(RegistrationConsumer):
     def get_registration_form_class(self, request):
         return OpenIDSignupForm
 
-    def get_success_url(self, request):
+    def get_success_url(self, request, allowSignup = True):
         # @@@ honor custom redirect more fully (this is used primarily for
         # the default fallback)
-        if hasattr(settings, "SIGNUP_REDIRECT_URLNAME"):
+        if allowSignup and hasattr(settings, "SIGNUP_REDIRECT_URLNAME"):
             fallback_url = reverse(settings.SIGNUP_REDIRECT_URLNAME)
         else:
             if hasattr(settings, "LOGIN_REDIRECT_URLNAME"):
                 fallback_url = reverse(settings.LOGIN_REDIRECT_URLNAME)
             else:
                 fallback_url = settings.LOGIN_REDIRECT_URL
+
         return get_default_redirect(request, fallback_url, self.redirect_field_name)
     
     def do_register(self, request, message=None):
@@ -87,12 +89,17 @@ class PinaxConsumer(RegistrationConsumer):
         # check to ACCOUNT_OPEN_SIGNUP to allow users who have existing OpenID
         # association to login even when ACCOUNT_OPEN_SIGNUP is turned off.
         if openid_url:
+            next_url = request.POST.get(self.redirect_field_name, None)
+            if next_url:
+                register_complete_url = "../register_complete/?%s=%s" % (self.redirect_field_name, next_url)
+            else:
+                register_complete_url = "../register_complete/"
+                
             return self.start_openid_process(request,
                 user_url = openid_url,
-                on_complete_url = self.get_success_url(request),
-                    #urlparse.urljoin(
-                    #request.path, "../register_complete/"
-                #),
+                on_complete_url = urlparse.urljoin(
+                    request.path, register_complete_url
+                ),
                 trust_root = urlparse.urljoin(request.path, "..")
             )
         
