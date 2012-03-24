@@ -48,6 +48,18 @@ class PinaxConsumer(RegistrationConsumer):
     
     def get_registration_form_class(self, request):
         return OpenIDSignupForm
+
+    def get_success_url(self, request):
+        # @@@ honor custom redirect more fully (this is used primarily for
+        # the default fallback)
+        if hasattr(settings, "SIGNUP_REDIRECT_URLNAME"):
+            fallback_url = reverse(settings.SIGNUP_REDIRECT_URLNAME)
+        else:
+            if hasattr(settings, "LOGIN_REDIRECT_URLNAME"):
+                fallback_url = reverse(settings.LOGIN_REDIRECT_URLNAME)
+            else:
+                fallback_url = settings.LOGIN_REDIRECT_URL
+        return get_default_redirect(request, fallback_url, self.redirect_field_name)
     
     def do_register(self, request, message=None):
         """
@@ -77,9 +89,10 @@ class PinaxConsumer(RegistrationConsumer):
         if openid_url:
             return self.start_openid_process(request,
                 user_url = openid_url,
-                on_complete_url = urlparse.urljoin(
-                    request.path, "../register_complete/"
-                ),
+                on_complete_url = self.get_success_url(request),
+                    #urlparse.urljoin(
+                    #request.path, "../register_complete/"
+                #),
                 trust_root = urlparse.urljoin(request.path, "..")
             )
         
@@ -123,16 +136,7 @@ class PinaxConsumer(RegistrationConsumer):
                             "user": user_display(user)
                         }
                     )
-                    # @@@ honor custom redirect more fully (this is used primarily for
-                    # the default fallback)
-                    if hasattr(settings, "SIGNUP_REDIRECT_URLNAME"):
-                        fallback_url = reverse(settings.SIGNUP_REDIRECT_URLNAME)
-                    else:
-                        if hasattr(settings, "LOGIN_REDIRECT_URLNAME"):
-                            fallback_url = reverse(settings.LOGIN_REDIRECT_URLNAME)
-                        else:
-                            fallback_url = settings.LOGIN_REDIRECT_URL
-                    success_url = get_default_redirect(request, fallback_url, self.redirect_field_name)
+                    success_url = self.get_success_url(request)
                     return HttpResponseRedirect(success_url)
         else:
             form = RegistrationForm(
