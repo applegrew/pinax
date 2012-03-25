@@ -1,0 +1,6 @@
+{# NOTE: This file may not get used. To be sure copy this file along with its folder to your app templates folder #}
+{% load i18n %}{% load account_tags %}{% user_display user as username %}
+{% blocktrans with current_site.name as site_name %}User '{{ username }}' at {{ site_name }} has given this as an email address.
+
+To confirm this is correct, go to {{ activate_url }}
+{% endblocktrans %}

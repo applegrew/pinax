@@ -1,0 +1,2 @@
+{# NOTE: This file may not get used. To be sure copy this file along with its folder to your app templates folder #}
+{% load i18n %}{% blocktrans with current_site.name as site_name %}Confirm email address for {{ site_name }}{% endblocktrans %}
