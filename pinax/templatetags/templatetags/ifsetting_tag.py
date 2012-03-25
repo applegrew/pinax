@@ -36,6 +36,18 @@ def ifsetting(parser, token):
         parser.delete_first_token()
     else:
         nodelist_false = template.NodeList()
+
+    if len(bits) < 2:
+        raise Exception('Not adequest number of template variables')
+    settingVar = bits[1]
+        
+    if settingVar == 'not':
+        if len(bits) < 3:
+            raise Exception('Not adequest number of template variables')
+        settingVar = bits[2]
+        a = nodelist_true
+        nodelist_true = nodelist_false
+        nodelist_false = nodelist_true
     
-    return IfSettingNode(nodelist_true, nodelist_false, bits[1])
+    return IfSettingNode(nodelist_true, nodelist_false, settingVar)
     
