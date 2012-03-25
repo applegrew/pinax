@@ -1,5 +1,5 @@
 from django.conf import settings
-
+from django.utils.translation import ugettext
 from django.contrib.auth import login
 
 from pinax.apps.account.signals import user_logged_in, password_changed
@@ -26,7 +26,14 @@ def get_default_redirect(request, fallback_url, redirect_field_name="next", sess
 
 
 def user_display(user):
-    func = getattr(settings, "ACCOUNT_USER_DISPLAY", lambda user: user.username)
+    opendIdOnly = getattr(settings, "ACCOUNT_USE_OPENID_ONLY", False)
+    if opendIdOnly:
+        ufunc = lambda user: ugettext(u"You")
+    else:
+        ufunc = lambda user: user.username
+        
+    func = getattr(settings, "ACCOUNT_USER_DISPLAY", ufunc)
+    
     return func(user)
 
 

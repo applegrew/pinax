@@ -281,11 +281,23 @@ class OpenIDSignupForm(SignupForm):
         kwargs.pop("no_duplicate_emails", False)
         
         super(OpenIDSignupForm, self).__init__(*args, **kwargs)
-        
+
         # these fields make no sense in OpenID
         del self.fields["password1"]
         del self.fields["password2"]
 
+        self.ACCOUNT_USE_OPENID_ONLY = getattr(settings, 'ACCOUNT_USE_OPENID_ONLY', False)
+        if self.ACCOUNT_USE_OPENID_ONLY:
+            del self.fields["username"]
+
+    def create_user(self, username=None, commit=True):
+        if not username and self.ACCOUNT_USE_OPENID_ONLY:
+            from random import choice, seed
+            from string import letters
+            seed(self.cleaned_data["email"].strip())
+            username = ''.join([choice(letters) for i in xrange(30)])
+            
+        return super(OpenIDSignupForm, self).create_user(username, commit)
 
 class UserForm(forms.Form):
     
