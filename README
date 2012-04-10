@@ -1,3 +1,11 @@
+Please note this is an updated version (as on 2012) of Pinax. This may not play nice
+with the components listed in the original Pinax project. I have forked all those
+(component) projects and have applied my own fixes and enhancements. The starter projects
+of this version of Pinax have been updated to point to my updated components (wherever
+required).
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Pinax: a platform for rapidly developing websites
 http://pinaxproject.com/
 
@@ -19,6 +27,7 @@ Freenode or the pinax-users mailing list on Google Groups.
 
 
 INSTALLATION
+============
 
 We have documented how to get started with Pinax on our website:
 
@@ -26,6 +35,7 @@ We have documented how to get started with Pinax on our website:
 
 
 BUGS
+====
 
 If you think you have discovered a bug in Pinax you should report it! We keep
 track of all bugs and features at http://code.pinaxproject.com/. Create an
@@ -33,6 +43,7 @@ account and report the bug with as much information to help us reproduce it.
 
 
 FOLLOWING ALONG
+===============
 
 If you would like to keep up with current Pinax news/happenings you can follow
 our Twitter accounts:
