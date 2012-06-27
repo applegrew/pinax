@@ -47,7 +47,7 @@ def ifsetting(parser, token):
         settingVar = bits[2]
         a = nodelist_true
         nodelist_true = nodelist_false
-        nodelist_false = nodelist_true
+        nodelist_false = a
     
     return IfSettingNode(nodelist_true, nodelist_false, settingVar)
     
